@@ -1,0 +1,37 @@
+---
+title: "Untitled"
+author: "Jin Cao"
+date: "2023-11-19"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+
+```
+
+## R Markdown
+#data simulation
+```{r}
+set.seed(1)
+sigma = 1
+b0 = 1
+b1 = 1
+alpha = 5
+M = 1000
+
+error = 0
+for(i in 1:M){
+  x = rnorm(M,1,sigma) 
+  mu = exp(b0 + b1*x)
+  y = rnbinom(M,size = alpha, mu = mu)
+
+  model1 = glm(y ~ x, family = "poisson")
+
+  coef = coef(model1)["x"]
+  se = sqrt(vcov(model1)["x", "x"])
+  z = (1 - coef) / se
+  p_value = 2 * (1 - pnorm(abs(z)))
+  error[i] = ifelse(p_value < 0.05, 0, 1)
+}
+mean(error)
+```
