@@ -1,0 +1,237 @@
+---
+title: "Simulation Study 2"
+author: "Jin Cao" "Yijia Xue"
+date: "2023-11-19"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+
+```
+
+## R Markdown
+#Parameter Setting
+```{r}
+set.seed(1)
+sigma.2 = 1
+b0 = 1
+b1 = 1
+alpha = 5
+M = 1000
+```
+
+#Poisson Regression
+```{r}
+reject = 0
+for(i in 1:M){
+  x = rnorm(M,1,sigma.2) 
+  mu = exp(b0 + b1*x)
+  y = rnbinom(M,size = alpha, mu = mu)
+
+  model1 = glm(y ~ x, family = "poisson")
+
+  coef = coef(model1)["x"]
+  se = sqrt(vcov(model1)["x", "x"])
+  z = (1 - coef) / se
+  p_value = 1 - pnorm(abs(z))
+  reject[i] = ifelse(p_value < 0.025, 0, 1)
+}
+mean(reject)
+```
+
+
+# Yijia's edit (Poisson)
+
+```{r}
+set.seed(1000)
+# i
+M<-1000
+alpha<-5
+#alpha=1/r
+r=1/(alpha)
+b0<-1
+b1<-1
+sigma.2<-1
+est<-list()
+asym_var<-list()
+T<-c()
+for(i in 1:M){
+  # ii
+  x = rnorm(M,1,sigma.2) 
+  mu = exp(b0 + b1*x)
+  
+  p<-r/(mu+r)
+
+  y = rnbinom(M,size = r,prob=p)
+  ## fitting poisson log-linear regression
+  fit<- glm(y~x, family = "poisson")
+  # iii & iv
+  beta<-summary(fit)$coefficients
+  est[[i]]<-beta[,1]
+  vcov<-summary(fit)$cov.unscaled
+  asym_var[[i]]<-summary(fit)$cov.unscaled
+  # v
+  T[i]<-(vcov[2,2])^(-1)* (beta[2,1]-1)^2
+}
+ # vi
+(alpha_hat<-mean(T>=qchisq(0.95,1)))
+
+# vii
+beta_hat_bar<-colMeans(do.call(rbind,est))
+asym_var_mc<-Reduce('+',asym_var)/M
+emp<- list()
+
+for (i in 1:M) {
+  bias=est[[i]]-beta_hat_bar
+  bias.m<- matrix(c(bias[1],bias[2]), nrow=2,ncol=1)
+  emp[[i]]<- bias.m %*% t(bias.m)
+}
+
+####check####
+emp_var_mc <- Reduce('+',emp)/(M-1)
+
+# viii
+## true value of beta is (1,1)
+beta_hat_bar
+
+asym_var_mc
+emp_var_mc
+
+# alpha=0.05
+alpha_hat
+```
+
+# (b) nagative binomial regression
+
+```{r}
+library(MASS)
+
+set.seed(1000)
+# i
+M<-1000
+alpha<-5
+#alpha=1/r
+r=1/(alpha)
+b0<-1
+b1<-1
+sigma.2<-1
+est<-list()
+asym_var<-list()
+T<-c()
+for(i in 1:M){
+  # ii
+  x = rnorm(M,1,sigma.2) 
+  mu = exp(b0 + b1*x)
+  
+  p<-r/(mu+r)
+
+  y = rnbinom(M,size = r,prob=p)
+## fitting negative binomial log-linear regression
+  fit<- glm.nb(y~x, link=log)
+  # iii & iv
+  beta<-summary(fit)$coefficients
+  est[[i]]<-beta[,1]
+  vcov<-summary(fit)$cov.unscaled
+  asym_var[[i]]<-summary(fit)$cov.unscaled
+  # v
+  T[i]<-(vcov[2,2])^(-1)* (beta[2,1]-1)^2
+}
+ # vi
+(alpha_hat<-mean(T>=qchisq(0.95,1)))
+
+# vii
+beta_hat_bar<-colMeans(do.call(rbind,est))
+asym_var_mc<-Reduce('+',asym_var)/M
+emp<- list()
+
+for (i in 1:M) {
+  bias=est[[i]]-beta_hat_bar
+  bias.m<- matrix(c(bias[1],bias[2]), nrow=2,ncol=1)
+  emp[[i]]<- bias.m %*% t(bias.m)
+}
+
+####check####
+emp_var_mc <- Reduce('+',emp)/(M-1)
+
+# viii
+## true value of beta is (1,1)
+beta_hat_bar
+
+asym_var_mc
+emp_var_mc
+
+# alpha=0.05
+alpha_hat
+```
+
+# (c) semiparametric log-linear model
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+library(gee)
+
+set.seed(1000)
+# i
+M<-1000
+alpha<-5
+#alpha=1/r
+r=1/(alpha)
+b0<-1
+b1<-1
+sigma.2<-1
+est<-list()
+asym_var<-list()
+T<-c()
+for(i in 1:M){
+  # ii
+  x = rnorm(M,1,sigma.2) 
+  mu = exp(b0 + b1*x)
+  
+  p<-r/(mu+r)
+
+  y = rnbinom(M,size = r,prob=p)
+  
+## fitting gee
+  df = data.frame(y = y, x = x, id = seq(1,M))
+  fit<- gee(y~x, id= id, family = "poisson", data = df)
+  
+  # iii & iv
+  beta<-fit$coefficients
+  est[[i]]<-beta[2]
+  vcov<-fit$robust.variance
+  asym_var[[i]]<-fit$robust.variance
+  
+  # v
+  T[i]<-(vcov[2,2])^(-1)* (beta[2]-1)^2
+}
+
+ # vi
+alpha_hat<-mean(T>=qchisq(0.95,1))
+
+# vii
+beta_hat_bar<-colMeans(do.call(rbind,est))
+asym_var_mc<-Reduce('+',asym_var)/M
+emp<- list()
+
+for (i in 1:M) {
+  bias=est[[i]]-beta_hat_bar
+  bias.m<- matrix(c(bias[1],bias[2]), nrow=2,ncol=1)
+  emp[[i]]<- bias.m %*% t(bias.m)
+}
+
+####check####
+emp_var_mc <- Reduce('+',emp)/(M-1)
+
+# viii
+## true value of beta is (1,1)
+beta_hat_bar
+
+asym_var_mc
+emp_var_mc
+
+# alpha=0.05
+alpha_hat
+```
+```
+
+
+
